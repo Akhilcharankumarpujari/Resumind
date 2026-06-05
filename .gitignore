@@ -1,0 +1,16 @@
+.DS_Store
+/node_modules/
+/.react-router/
+/build/
+
+# Environment variables (credentials)
+.env
+.env.local
+.env.production
+.env.development
+/backend/.env
+
+# Backend built binaries & uploads
+/backend/server
+/backend/resumind-server.exe
+/backend/uploads/
