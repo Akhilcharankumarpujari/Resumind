@@ -13,6 +13,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/limiter"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/google/uuid"
 )
@@ -38,6 +39,7 @@ func main() {
 		BodyLimit:    20 * 1024 * 1024,
 		ReadTimeout:  60 * time.Second,
 		WriteTimeout: 120 * time.Second,
+		ProxyHeader:  fiber.HeaderXForwardedFor,
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
 			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 		},
@@ -50,6 +52,14 @@ func main() {
 		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
 		AllowMethods:     "GET, POST, DELETE, OPTIONS",
 		AllowCredentials: true,
+	}))
+
+	app.Use(limiter.New(limiter.Config{
+		Max:        100,
+		Expiration: 1 * time.Minute,
+		LimitReached: func(c *fiber.Ctx) error {
+			return c.Status(429).JSON(fiber.Map{"error": "Too many requests. Please try again later."})
+		},
 	}))
 
 

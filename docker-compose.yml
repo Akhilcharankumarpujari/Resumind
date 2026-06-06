@@ -9,7 +9,7 @@ services:
       MYSQL_ROOT_PASSWORD: akhil123
       MYSQL_DATABASE: resumind
     ports:
-      - "3306:3306"
+      - "127.0.0.1:3306:3306"
     volumes:
       - mysql-data:/var/lib/mysql
 

@@ -14,3 +14,7 @@
 /backend/server
 /backend/resumind-server.exe
 /backend/uploads/
+
+# Private key files
+*.pem
+resumind-key.pem
