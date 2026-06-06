@@ -194,7 +194,7 @@ function LandingPage() {
       <section className="relative pt-16 pb-20 px-6 text-center max-w-5xl mx-auto overflow-hidden">
         {}
         <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-indigo-200/40 rounded-full blur-[120px] pointer-events-none -z-10 animate-pulse" />
-        <div className="absolute top-20 left-1/4 w-[300px] h-[300px] bg-rose-200/30 rounded-full blur-[100px] pointer-events-none -z-10" />
+        <div className="absolute top-20 left-1/4 w-[300px] h-[300px] bg-indigo-200/20 rounded-full blur-[100px] pointer-events-none -z-10" />
         <div className="animate-fade-in flex flex-col items-center gap-6">
           <h1 className="text-4xl sm:text-5xl md:text-7xl font-extrabold tracking-tight leading-tight max-w-4xl text-gradient">
             Pass the ATS. <br />Land the Interview.
