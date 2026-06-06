@@ -88,8 +88,8 @@ func HandleGoogleAuth(c *fiber.Ctx) error {
 		Name:     "auth_token",
 		Value:    jwtToken,
 		HTTPOnly: true,
-		Secure:   false,
-		SameSite: "Lax",
+		Secure:   true,
+		SameSite: "Strict",
 		Expires:  time.Now().Add(7 * 24 * time.Hour),
 		Path:     "/",
 	})
@@ -118,10 +118,13 @@ func HandleGetMe(c *fiber.Ctx) error {
 
 func HandleLogout(c *fiber.Ctx) error {
 	c.Cookie(&fiber.Cookie{
-		Name:    "auth_token",
-		Value:   "",
-		Expires: time.Now().Add(-1 * time.Hour),
-		Path:    "/",
+		Name:     "auth_token",
+		Value:    "",
+		HTTPOnly: true,
+		Secure:   true,
+		SameSite: "Strict",
+		Expires:  time.Now().Add(-1 * time.Hour),
+		Path:     "/",
 	})
 	return c.JSON(fiber.Map{"message": "Logged out successfully"})
 }
