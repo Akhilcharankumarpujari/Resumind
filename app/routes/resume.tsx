@@ -85,12 +85,12 @@ const Resume = () => {
           {}
           <section className="feedback-section bg-[url('/images/bg-small.svg')] bg-cover h-[100vh] sticky top-0 items-center justify-center">
             {pdfUrl ? (
-              <div className="animate-in fade-in duration-1000 gradient-border max-sm:m-0 h-[90%] max-wxl:h-fit w-fit">
+              <div className="animate-in fade-in duration-1000 gradient-border max-sm:m-0 h-[90%] max-wxl:h-fit w-full sm:w-fit">
                 <iframe
                   src={pdfUrl}
                   title="Resume PDF"
                   className="w-full h-full rounded-2xl"
-                  style={{ minWidth: 320, minHeight: 400 }}
+                  style={{ width: "100%", minWidth: "280px", minHeight: "450px" }}
                 />
               </div>
             ) : (
