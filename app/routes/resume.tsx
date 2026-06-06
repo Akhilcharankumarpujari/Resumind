@@ -83,14 +83,27 @@ const Resume = () => {
       {!loadError && (
         <div className="flex flex-row w-full max-lg:flex-col-reverse">
           {}
-          <section className="feedback-section bg-[url('/images/bg-small.svg')] bg-cover h-[100vh] sticky top-0 items-center justify-center">
+          <section className="feedback-section bg-[url('/images/bg-small.svg')] bg-cover h-fit lg:h-[100vh] lg:sticky lg:top-0 items-center justify-center max-lg:py-8 max-lg:px-4">
             {pdfUrl ? (
-              <div className="animate-in fade-in duration-1000 gradient-border max-sm:m-0 h-[90%] max-wxl:h-fit w-full sm:w-fit">
+              <div className="animate-in fade-in duration-1000 gradient-border w-full max-w-md h-fit lg:h-[90%]">
+                {/* Mobile Fallback: PDF download card */}
+                <div className="flex flex-col items-center justify-center gap-4 bg-white rounded-2xl p-8 text-center shadow-md border border-gray-100 lg:hidden">
+                  <img src="/images/pdf.png" alt="PDF Icon" className="w-16 h-16 object-contain" />
+                  <div>
+                    <h3 className="font-bold text-gray-800 text-lg">Your Resume PDF</h3>
+                    <p className="text-sm text-gray-500 mt-1">Mobile web browsers cannot preview PDF files directly inside the page.</p>
+                  </div>
+                  <a href={pdfUrl} download className="primary-button text-sm py-2.5 px-6 font-semibold flex items-center justify-center gap-2 max-w-[200px] mx-auto">
+                    Download / Open PDF
+                  </a>
+                </div>
+
+                {/* Desktop: standard PDF iframe preview */}
                 <iframe
                   src={pdfUrl}
                   title="Resume PDF"
-                  className="w-full h-full rounded-2xl"
-                  style={{ width: "100%", minWidth: "280px", minHeight: "450px" }}
+                  className="hidden lg:block w-full h-full rounded-2xl"
+                  style={{ minHeight: "500px" }}
                 />
               </div>
             ) : (
