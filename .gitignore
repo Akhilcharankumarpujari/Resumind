@@ -18,3 +18,7 @@
 # Private key files
 *.pem
 resumind-key.pem
+
+# Local utility scripts with database passwords
+view_users.py
+
