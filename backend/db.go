@@ -79,9 +79,16 @@ func InitDB() {
 	}
 
 	var err error
-	DB, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	for i := 1; i <= 10; i++ {
+		DB, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
+		if err == nil {
+			break
+		}
+		log.Printf("Failed to connect to MySQL database (attempt %d/10): %v. Retrying in 3 seconds...", i, err)
+		time.Sleep(3 * time.Second)
+	}
 	if err != nil {
-		log.Fatalf("Failed to connect to MySQL database: %v", err)
+		log.Fatalf("Failed to connect to MySQL database after 10 attempts: %v", err)
 	}
 
 
