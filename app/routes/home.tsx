@@ -551,7 +551,7 @@ function LandingPage() {
 
       {}
       <footer className="border-t border-gray-200/50 pt-10 px-6 max-w-6xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-6 text-gray-400 text-xs">
-        <p>© 2026 Resumind. All rights reserved.</p>
+        <p>© 2026 Resumind. All rights reserved. By Akhil Charan Kumar.</p>
         <div className="flex gap-6">
           <Link to="/" className="hover:text-gray-600 transition-colors">Privacy Policy</Link>
           <Link to="/" className="hover:text-gray-600 transition-colors">Terms of Service</Link>
