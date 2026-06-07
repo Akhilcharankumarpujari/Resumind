@@ -555,7 +555,7 @@ function LandingPage() {
         <div className="flex gap-6">
           <Link to="/" className="hover:text-gray-600 transition-colors">Privacy Policy</Link>
           <Link to="/" className="hover:text-gray-600 transition-colors">Terms of Service</Link>
-          <a href="mailto:support@resumind.com" className="hover:text-gray-600 transition-colors">Contact Support</a>
+          <a href="mailto:akhilcharankumar001@gmail.com" className="hover:text-gray-600 transition-colors">Contact Support</a>
         </div>
       </footer>
     </div>
