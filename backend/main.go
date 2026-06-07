@@ -68,6 +68,10 @@ func main() {
 	}))
 
 
+	app.Get("/health", func(c *fiber.Ctx) error {
+		return c.Status(200).JSON(fiber.Map{"status": "healthy"})
+	})
+
 	auth := app.Group("/api/auth")
 	auth.Post("/google", HandleGoogleAuth)
 	auth.Get("/me", AuthMiddleware, HandleGetMe)
