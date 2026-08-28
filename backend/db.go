@@ -1,8 +1,8 @@
 package main
 
 import (
-	"crypto/tls"
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"time"
@@ -74,87 +74,103 @@ func (r *Resume) AfterFind(tx *gorm.DB) error {
 	return nil
 }
 
-// InitDB opens a GORM connection to MySQL using the MYSQL_DSN environment
-// variable and runs AutoMigrate.
+// InitDB opens a GORM/MySQL connection using the MYSQL_DSN environment variable.
 //
-// DSN format (go-sql-driver/mysql):
+// ── DSN format (go-sql-driver/mysql) ──────────────────────────────────────────
 //
-//	user:password@tcp(host:port)/dbname?parseTime=true[&tls=true]
+//	user:password@tcp(host:port)/dbname?parseTime=true[&tls=skip-verify]
 //
-// When tls=true is present, a custom TLS config with InsecureSkipVerify is
-// registered so that managed cloud MySQL providers (Aiven, PlanetScale, etc.)
-// that use custom CA chains can still be reached over encrypted connections.
+// ── TLS for managed providers (Aiven, PlanetScale, Railway, …) ───────────────
+//
+//	Use tls=skip-verify in MYSQL_DSN.
+//	"skip-verify" is a built-in go-sql-driver/mysql TLS config that enables
+//	full encryption while skipping CA certificate chain validation.
+//	This is necessary because managed MySQL providers use custom CAs that
+//	are not present in the Go runtime's system certificate pool.
+//
+//	DO NOT use tls=true with Aiven — it will fail with "unknown network" or
+//	"x509: certificate signed by unknown authority".
+//
+// ── Local Docker ──────────────────────────────────────────────────────────────
+//
+//	Omit the tls parameter entirely: ...?parseTime=true
 func InitDB() {
 	rawDSN := os.Getenv("MYSQL_DSN")
 	if rawDSN == "" {
-		log.Fatal("MYSQL_DSN environment variable is not set.\n" +
-			"Expected format: user:password@tcp(host:port)/dbname?parseTime=true")
+		log.Fatal(
+			"MYSQL_DSN environment variable is not set.\n" +
+				"For Aiven: user:password@tcp(host:port)/dbname?parseTime=true&tls=skip-verify\n" +
+				"For local: user:password@tcp(127.0.0.1:3306)/dbname?parseTime=true",
+		)
 	}
 
-	// ── Step 1: Parse the DSN into a structured config ─────────────────────
-	// ParseDSN understands the full go-sql-driver/mysql DSN grammar and
-	// populates typed fields (Net, Addr, User, Passwd, DBName, TLSConfig, …).
-	// This is the authoritative way to inspect and modify a DSN — never split
-	// the raw string manually.
-	cfg, err := sqldrvmysql.ParseDSN(rawDSN)
-	if err != nil {
-		log.Fatalf("MYSQL_DSN is not a valid go-sql-driver/mysql DSN: %v\n"+
-			"Expected format: user:password@tcp(host:port)/dbname?parseTime=true", err)
+	// ── Parse DSN → structured config ─────────────────────────────────────
+	// Using ParseDSN (the driver's own parser) is the only safe way to
+	// inspect and modify a DSN. Never split the raw string manually — the
+	// password may contain characters like @, =, & that would break any
+	// hand-written parser.
+	cfg, parseErr := sqldrvmysql.ParseDSN(rawDSN)
+	if parseErr != nil {
+		log.Fatalf(
+			"MYSQL_DSN is not a valid go-sql-driver/mysql DSN: %v\n"+
+				"For Aiven: user:password@tcp(host:port)/dbname?parseTime=true&tls=skip-verify",
+			parseErr,
+		)
 	}
 
-	// ── Step 2: Ensure the network field is set ─────────────────────────────
-	// go-sql-driver/mysql defaults Net to "tcp" during ParseDSN, but guard
-	// explicitly so that a bare host:port DSN (no tcp(...) wrapper) still
-	// works rather than producing "unknown network".
+	// ── Ensure network is set ─────────────────────────────────────────────
+	// ParseDSN sets cfg.Net to "tcp" by default when a host:port address is
+	// present. Guard against the empty-string edge case so we never pass a
+	// blank network to net.Dial (which would surface as "unknown network").
 	if cfg.Net == "" {
 		cfg.Net = "tcp"
 	}
 
-	// ── Step 3: Register and apply a custom TLS config ─────────────────────
-	// When tls=true is requested, Go verifies the server cert against the
-	// system CA pool. Managed providers (Aiven, etc.) use their own CA that
-	// is NOT in the system pool, so verification fails and the driver emits
-	// the misleading "unknown network" error.
-	//
-	// Fix: register a named TLS config with InsecureSkipVerify and point the
-	// DSN at it. The connection remains fully encrypted; only the CA chain
-	// verification is relaxed. Set tls=false to disable TLS entirely (local
-	// Docker), or tls=skip-verify to use the driver's built-in equivalent.
+	// ── TLS normalisation ─────────────────────────────────────────────────
+	// "skip-verify"  → already a valid built-in name; pass through as-is.
+	// "true"         → would use the system CA pool, which does not contain
+	//                   Aiven's CA. Replace with "skip-verify" so the driver
+	//                   enables encryption without failing CA verification.
+	//                   The TLS config name "skip-verify" is pre-registered
+	//                   by go-sql-driver/mysql and requires no additional
+	//                   RegisterTLSConfig call.
+	// ""  / "false"  → no TLS (local dev). Leave unchanged.
 	if cfg.TLSConfig == "true" {
-		const tlsName = "custom-ca"
-		if regErr := sqldrvmysql.RegisterTLSConfig(tlsName, &tls.Config{
-			InsecureSkipVerify: true, //nolint:gosec // intentional for managed MySQL CAs
-		}); regErr != nil {
-			// A non-nil error means the name is already registered (e.g. from
-			// a previous call). That is fine — the config is still usable.
-			log.Printf("TLS config '%s' already registered (this is fine): %v", tlsName, regErr)
-		}
-		cfg.TLSConfig = tlsName
+		cfg.TLSConfig = "skip-verify"
 	}
 
-	// ── Step 4: Rebuild the DSN from the corrected config ──────────────────
-	// FormatDSN serialises all fields back into a valid DSN string.  This is
-	// the only mutation of the DSN — no manual string splitting or replacing.
+	// ── Rebuild the DSN from the (possibly modified) config ───────────────
+	// FormatDSN serialises all struct fields back into a canonically valid
+	// DSN string. This is the only place the DSN is mutated.
 	dsn := cfg.FormatDSN()
 
-	// ── Step 5: Open the database connection with retries ──────────────────
+	// ── Log connection target (host/port only — never credentials) ────────
+	log.Printf("Connecting to MySQL at %s (net=%s, tls=%s)", cfg.Addr, cfg.Net, cfg.TLSConfig)
+
+	// ── Open connection with retries ──────────────────────────────────────
 	var dbErr error
 	for attempt := 1; attempt <= 10; attempt++ {
 		DB, dbErr = gorm.Open(mysql.Open(dsn), &gorm.Config{})
 		if dbErr == nil {
 			break
 		}
-		log.Printf("MySQL connection attempt %d/10 failed: %v — retrying in 3 s...", attempt, dbErr)
+		log.Printf("MySQL connect attempt %d/10 failed: %v — retrying in 3 s...", attempt, dbErr)
 		time.Sleep(3 * time.Second)
 	}
 	if dbErr != nil {
 		log.Fatalf("Failed to connect to MySQL after 10 attempts: %v", dbErr)
 	}
 
-	// ── Step 6: Auto-migrate schema ────────────────────────────────────────
+	// ── Auto-migrate schema ───────────────────────────────────────────────
 	if migrateErr := DB.AutoMigrate(&User{}, &Resume{}); migrateErr != nil {
 		log.Fatalf("AutoMigrate failed: %v", migrateErr)
 	}
 
-	log.Println("✅ Connected to MySQL and migrated schema successfully")
+	log.Printf("✅ Connected to MySQL at %s and migrated schema successfully", cfg.Addr)
+}
+
+// safeRedactDSN returns a DSN-like string with the password replaced by ***
+// for use in diagnostic messages. Never log the real DSN.
+func safeRedactDSN(cfg *sqldrvmysql.Config) string {
+	return fmt.Sprintf("%s:***@%s(%s)/%s", cfg.User, cfg.Net, cfg.Addr, cfg.DBName)
 }
