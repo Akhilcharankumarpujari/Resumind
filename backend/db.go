@@ -3,28 +3,18 @@ package main
 import (
 	"encoding/json"
 	"log"
+	"net/url"
 	"os"
+	"strings"
 	"time"
 
-	sqldrvmysql "github.com/go-sql-driver/mysql"
-	"gorm.io/driver/mysql"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
 var DB *gorm.DB
 
-// validMySQLNetworks is the set of network types accepted by go-sql-driver/mysql.
-// Any value outside this set in cfg.Net after ParseDSN indicates a malformed DSN.
-var validMySQLNetworks = map[string]bool{
-	"tcp":        true,
-	"tcp4":       true,
-	"tcp6":       true,
-	"unix":       true,
-	"unixgram":   true,
-	"unixpacket": true,
-}
-
-// User is the authenticated user account.
+// User is the authenticated user account model.
 type User struct {
 	ID        uint      `gorm:"primaryKey;autoIncrement" json:"id"`
 	GoogleID  string    `gorm:"type:varchar(255);uniqueIndex;not null" json:"google_id"`
@@ -35,7 +25,7 @@ type User struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// Resume is a stored resume analysis record.
+// Resume is a stored resume analysis record model.
 type Resume struct {
 	ID          string    `gorm:"primaryKey;type:varchar(36)" json:"id"`
 	UserID      uint      `gorm:"not null;index" json:"user_id"`
@@ -43,14 +33,14 @@ type Resume struct {
 	JobTitle    string    `gorm:"type:varchar(255);not null" json:"jobTitle"`
 	JobDesc     string    `gorm:"type:text" json:"jobDescription"`
 	FilePath    string    `gorm:"type:varchar(512);not null" json:"resumePath"`
-	FeedbackRaw string    `gorm:"type:longtext" json:"-"`
+	FeedbackRaw string    `gorm:"type:text" json:"-"`
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`
 
 	Feedback *Feedback `gorm:"-" json:"feedback,omitempty"`
 }
 
-// Feedback is the AI-generated resume analysis result.
+// Feedback is the AI-generated resume analysis result structure.
 type Feedback struct {
 	OverallScore int          `json:"overallScore"`
 	ATS          SectionScore `json:"ATS"`
@@ -84,130 +74,69 @@ func (r *Resume) AfterFind(tx *gorm.DB) error {
 	return nil
 }
 
-// InitDB opens a GORM/MySQL connection using the MYSQL_DSN environment variable.
+// InitDB connects to PostgreSQL using the DATABASE_URL environment variable and runs GORM AutoMigrate.
 //
-// Required DSN format (go-sql-driver/mysql):
+// Expected DSN formats:
 //
-//	user:password@tcp(host:port)/dbname?parseTime=true[&tls=skip-verify]
+//	Render / Cloud PostgreSQL (SSL enabled):
+//	  postgres://user:password@host:5432/dbname?sslmode=require
 //
-// The "@tcp(...)" part is mandatory. Omitting it causes the driver to parse
-// the username:password as the network protocol, which results in:
-//
-//	dial user:password: unknown network user:password
-//
-// For Aiven MySQL (custom CA, TLS required):
-//
-//	avnadmin:PASSWORD@tcp(host:22026)/defaultdb?parseTime=true&tls=skip-verify
-//
-// For local Docker MySQL (no TLS):
-//
-//	root:password@tcp(127.0.0.1:3306)/resumind?parseTime=true
+//	Local Development / Docker PostgreSQL (SSL disabled):
+//	  postgres://postgres:password@127.0.0.1:5432/resumind?sslmode=disable
 func InitDB() {
-	rawDSN := os.Getenv("MYSQL_DSN")
+	rawDSN := os.Getenv("DATABASE_URL")
+	if rawDSN == "" {
+		rawDSN = os.Getenv("POSTGRES_DSN")
+	}
+	if rawDSN == "" {
+		rawDSN = os.Getenv("MYSQL_DSN")
+	}
 	if rawDSN == "" {
 		log.Fatal(
-			"MYSQL_DSN is not set.\n" +
-				"Aiven format: user:password@tcp(host:port)/dbname?parseTime=true&tls=skip-verify\n" +
-				"Local format: user:password@tcp(127.0.0.1:3306)/dbname?parseTime=true",
+			"DATABASE_URL environment variable is not set.\n" +
+				"Production format: postgres://user:password@host:5432/dbname?sslmode=require\n" +
+				"Local format:      postgres://postgres:password@127.0.0.1:5432/resumind?sslmode=disable",
 		)
 	}
 
-	// ── Step 1: Parse DSN into a typed config struct ──────────────────────
-	//
-	// ParseDSN is the only correct way to read a DSN. It handles @, = and &
-	// inside passwords correctly. Hand-written string splitting will break.
-	cfg, parseErr := sqldrvmysql.ParseDSN(rawDSN)
-	if parseErr != nil {
-		log.Fatalf(
-			"MYSQL_DSN is not valid: %v\n"+
-				"Required format: user:password@tcp(host:port)/dbname?parseTime=true&tls=skip-verify",
-			parseErr,
-		)
+	// Sanitize / ensure valid scheme for GORM PostgreSQL driver
+	dsn := rawDSN
+	if strings.HasPrefix(dsn, "mysql://") {
+		log.Fatal("MYSQL_DSN is obsolete. Please update environment variable to DATABASE_URL with postgres:// scheme.")
 	}
 
-	// ── Step 2: Validate cfg.Net ──────────────────────────────────────────
-	//
-	// After ParseDSN the cfg.Net field MUST be one of the Go network types
-	// (tcp, unix, …). If it is anything else — especially if it looks like
-	// "user:password" — the DSN is missing the "@tcp(...)" part.
-	//
-	// Failure mode that occurred on Render:
-	//   DSN:       avnadmin:PASS(host:22026)/defaultdb?tls=skip-verify
-	//              ↑ missing "@tcp"
-	//   Parsed as: cfg.Net="avnadmin:PASS"  cfg.User=""  cfg.Addr="host:22026"
-	//   Result:    net.Dial("avnadmin:PASS", "host:22026") → unknown network
-	//
-	// The driver does NOT return an error from ParseDSN for this input; it
-	// silently accepts "avnadmin:PASS" as a custom network type.
-	if !validMySQLNetworks[cfg.Net] {
-		// cfg.Net is not a Go network type — DSN is structurally broken.
-		// Log the target addr and TLS config for diagnostics; never log Net
-		// because it contains the credential in this malformed case.
-		log.Fatalf(
-			"MYSQL_DSN is structurally invalid: cfg.Net is not a recognized network type.\n"+
-				"This means the DSN is missing '@tcp(...)'. The '@' and 'tcp' keyword are required.\n\n"+
-				"  WRONG (missing @tcp):  user:password(host:port)/db?parseTime=true&tls=skip-verify\n"+
-				"  CORRECT:               user:password@tcp(host:port)/db?parseTime=true&tls=skip-verify\n\n"+
-				"Parsed addr=%q  tls=%q — update MYSQL_DSN in Render Environment Variables.",
-			cfg.Addr, cfg.TLSConfig,
-		)
-	}
+	targetLog := safeRedactPostgresDSN(dsn)
+	log.Printf("Connecting to PostgreSQL at %s", targetLog)
 
-	// ── Step 3: Validate cfg.User is present ─────────────────────────────
-	//
-	// A well-formed DSN with "@tcp(...)" always populates cfg.User.
-	// An empty User means the "@" separator was missing from the DSN.
-	if cfg.User == "" {
-		log.Fatal(
-			"MYSQL_DSN is missing the username. The '@' separator between credentials\n" +
-				"and the host is required: user:password@tcp(host:port)/db",
-		)
-	}
-
-	// ── Step 4: Normalise TLS ─────────────────────────────────────────────
-	//
-	// tls=skip-verify → built-in go-sql-driver name, pass through unchanged.
-	// tls=true        → uses system CA pool. Aiven's CA is NOT in the system
-	//                   pool. Replace with skip-verify to allow encrypted
-	//                   connections without CA chain verification.
-	// tls="" / false  → no TLS (local Docker). Leave unchanged.
-	if cfg.TLSConfig == "true" {
-		cfg.TLSConfig = "skip-verify"
-	}
-
-	// ── Step 5: Rebuild DSN once from the validated config ────────────────
-	//
-	// FormatDSN serialises all struct fields into a canonical DSN string.
-	// This is the only mutation of the DSN value — no string splitting,
-	// no strings.ReplaceAll, no manual construction.
-	dsn := cfg.FormatDSN()
-
-	// ── Step 6: Log connection target — never credentials ─────────────────
-	log.Printf("Connecting to MySQL: net=%s addr=%s db=%s tls=%s",
-		cfg.Net, cfg.Addr, cfg.DBName, cfg.TLSConfig)
-
-	// ── Step 7: Open GORM connection with retries ─────────────────────────
-	//
-	// gorm.Open(mysql.Open(dsn), ...) is the standard GORM+go-sql-driver
-	// connection call. The complete DSN string is passed as one argument.
-	// Credentials are NOT passed separately; they are embedded in dsn.
 	var dbErr error
 	for attempt := 1; attempt <= 10; attempt++ {
-		DB, dbErr = gorm.Open(mysql.Open(dsn), &gorm.Config{})
+		DB, dbErr = gorm.Open(postgres.Open(dsn), &gorm.Config{})
 		if dbErr == nil {
 			break
 		}
-		log.Printf("MySQL connect attempt %d/10 failed: %v — retrying in 3 s...", attempt, dbErr)
+		log.Printf("PostgreSQL connect attempt %d/10 failed: %v — retrying in 3 s...", attempt, dbErr)
 		time.Sleep(3 * time.Second)
 	}
 	if dbErr != nil {
-		log.Fatalf("Failed to connect to MySQL after 10 attempts: %v", dbErr)
+		log.Fatalf("Failed to connect to PostgreSQL after 10 attempts: %v", dbErr)
 	}
 
-	// ── Step 8: Auto-migrate schema ───────────────────────────────────────
+	// Auto-migrate database tables
 	if migrateErr := DB.AutoMigrate(&User{}, &Resume{}); migrateErr != nil {
 		log.Fatalf("AutoMigrate failed: %v", migrateErr)
 	}
 
-	log.Printf("✅ Connected to MySQL at %s — schema migrated", cfg.Addr)
+	log.Printf("✅ Connected to PostgreSQL (%s) — schema migrated successfully", targetLog)
+}
+
+// safeRedactPostgresDSN returns host:port/dbname with credentials masked for safe logging.
+func safeRedactPostgresDSN(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return "invalid-dsn"
+	}
+	host := u.Host
+	path := strings.TrimPrefix(u.Path, "/")
+	scheme := u.Scheme
+	return scheme + "://***@" + host + "/" + path
 }

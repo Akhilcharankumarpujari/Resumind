@@ -5,7 +5,7 @@
 [![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go&logoColor=white)](https://golang.org/)
 [![Go Fiber](https://img.shields.io/badge/Fiber-v2.52-00ACD7?logo=gofiber&logoColor=white)](https://gofiber.io/)
 [![GORM](https://img.shields.io/badge/GORM-v1.31-008080?logo=go&logoColor=white)](https://gorm.io/)
-[![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?logo=mysql&logoColor=white)](https://www.mysql.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
@@ -26,7 +26,8 @@
 - 💡 **Actionable Improvement Tips**: Specific suggestions categorized by priority (`critical`, `warning`, `suggestion`).
 - 🔐 **Google OAuth 2.0 & Session Security**: Secure single-sign-on (SSO) with JWT authentication supported by both HTTP-Only cookies and Bearer tokens.
 - 📁 **Resume History & Management**: View past resume scores, inspect detailed feedback reports, download uploaded PDFs, or delete records.
-- ⚡ **Production-Grade Architecture**: Designed for modern decoupled deployments (Vercel Frontend + Render Backend + Aiven MySQL).
+- ⚡ **Production-Grade Architecture**: Designed for modern decoupled deployments (Vercel Frontend + Render Backend + Render PostgreSQL).
+- 🧩 **PostgreSQL & Vector Extension Ready**: Structured database schema natively compatible with `pgvector` for future semantic resume search and embedding matching.
 
 ---
 
@@ -48,8 +49,8 @@
                          ┌──────────────────────────────┼──────────────────────────────┐
                          ▼                              ▼                              ▼
               ┌─────────────────────┐        ┌─────────────────────┐        ┌─────────────────────┐
-              │     Groq AI API     │        │    Aiven MySQL DB   │        │ Local Uploads Dir   │
-              │  (Llama-3 / GPT)    │        │  (TLS / GORM ORM)   │        │   (PDF Storage)     │
+              │     Groq AI API     │        │ Render PostgreSQL DB│        │ Local Uploads Dir   │
+              │  (Llama-3 / GPT)    │        │  (GORM / PG Driver) │        │   (PDF Storage)     │
               └─────────────────────┘        └─────────────────────┘        └─────────────────────┘
 ```
 
@@ -68,7 +69,7 @@
 ### Backend
 - **Language**: Go (Golang)
 - **Web Framework**: Fiber v2 (FastHTTP engine)
-- **ORM & Database**: GORM + `go-sql-driver/mysql` (MySQL 8.0 / Managed Aiven)
+- **ORM & Database**: GORM + `gorm.io/driver/postgres` (PostgreSQL 16)
 - **Authentication**: JWT (`golang-jwt/jwt/v5`) + Google Identity API (`google.golang.org/api/idtoken`)
 - **PDF Extraction**: `github.com/ledongthuc/pdf`
 - **AI Engine**: Groq Client (`github.com/sashabaranov/go-openai`)
@@ -80,7 +81,7 @@
 ### Prerequisites
 - **Node.js**: v20 or higher
 - **Go**: 1.22 or higher
-- **MySQL**: Local MySQL server (port 3306/3307) or Docker
+- **PostgreSQL**: Local PostgreSQL server (port 5432) or Docker
 - **Groq API Key**: Get a free key at [console.groq.com](https://console.groq.com/keys)
 - **Google OAuth Client ID**: Get one at [console.cloud.google.com](https://console.cloud.google.com/apis/credentials)
 
@@ -101,8 +102,8 @@ cd Resumind
 Create a `.env` file in the `backend/` directory:
 
 ```ini
-# MySQL Connection (Local Docker or MySQL)
-MYSQL_DSN=root:akhil123@tcp(127.0.0.1:3307)/resumind?parseTime=true
+# PostgreSQL Connection (Local Docker or Local PostgreSQL)
+DATABASE_URL=postgres://postgres:rootpassword@127.0.0.1:5432/resumind?sslmode=disable
 
 # Google OAuth 2.0 Credentials
 GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
@@ -140,10 +141,10 @@ cd backend
 go run .
 ```
 
-#### Option B: Manual Setup
-Make sure your local MySQL instance is running and create the `resumind` database:
+#### Option B: Manual PostgreSQL Setup
+Make sure your local PostgreSQL service is running and create the `resumind` database:
 ```sql
-CREATE DATABASE IF NOT EXISTS resumind;
+CREATE DATABASE resumind;
 ```
 Then run the Go backend:
 ```bash
@@ -169,7 +170,7 @@ Open `http://localhost:5173` in your browser.
 
 ## 🐳 Running Full Stack with Docker Compose
 
-To start the Database, Backend, Frontend, and Nginx reverse proxy together:
+To start PostgreSQL, Backend, Frontend, and Nginx proxy together:
 
 ```bash
 docker-compose up --build
@@ -189,23 +190,23 @@ Resumind is configured for a multi-cloud production architecture:
 - **Build Command**: `go build -o server .`
 - **Start Command**: `./server`
 - **Environment Variables**:
-  - `MYSQL_DSN`: `user:password@tcp(host:22026)/defaultdb?parseTime=true&tls=skip-verify`
+  - `DATABASE_URL`: `postgres://user:password@host:5432/dbname?sslmode=require`
   - `GROQ_API_KEY`: `gsk_...`
   - `GOOGLE_CLIENT_ID`: `...apps.googleusercontent.com`
   - `JWT_SECRET`: Generate a secure 32+ character random string
   - `ALLOWED_ORIGINS`: `https://your-app.vercel.app`
 
-### 2. Frontend → [Vercel](https://vercel.com)
+### 2. Database → [Render PostgreSQL](https://render.com/docs/databases) or Managed PostgreSQL
+- Create a PostgreSQL database on Render or any managed provider.
+- Set `DATABASE_URL` in the Render backend web service environment variables using the provided connection string (`sslmode=require`).
+
+### 3. Frontend → [Vercel](https://vercel.com)
 - **Framework Preset**: Vite / React Router
 - **Build Command**: `npm run build`
 - **Output Directory**: `build/client`
 - **Environment Variables**:
   - `VITE_API_URL`: `https://resumind-backend.onrender.com`
   - `VITE_GOOGLE_CLIENT_ID`: `...apps.googleusercontent.com`
-
-### 3. Database → [Aiven MySQL](https://aiven.io)
-- Ensure your Aiven MySQL instance enables SSL (`tls=skip-verify` in `MYSQL_DSN`).
-- `backend/db.go` automatically normalizes `tls=true` and `tls=skip-verify` configurations for managed cloud CAs.
 
 ---
 
@@ -227,7 +228,7 @@ Resumind is configured for a multi-cloud production architecture:
 
 ## 🧪 Testing
 
-Run backend unit and integration tests (DSN parsing, network validation, TLS configuration):
+Run backend unit and integration tests (PostgreSQL DSN parsing, URL validation, safe redaction):
 
 ```bash
 cd backend
@@ -246,14 +247,14 @@ npm run typecheck
 
 | Variable | Scope | Description | Required |
 | :--- | :--- | :--- | :---: |
-| `MYSQL_DSN` | Backend | MySQL connection string (`user:pass@tcp(host:port)/dbname?parseTime=true`) | Yes |
+| `DATABASE_URL` | Backend | PostgreSQL connection string (`postgres://user:pass@host:5432/dbname?sslmode=disable`) | Yes |
 | `GROQ_API_KEY` | Backend | Groq Cloud AI API key | Yes |
 | `GROQ_MODEL` | Backend | AI Model (default: `openai/gpt-oss-120b`) | No |
 | `GOOGLE_CLIENT_ID` | Backend/Frontend | Google OAuth 2.0 Client ID | Yes |
 | `GOOGLE_CLIENT_SECRET` | Backend | Google OAuth 2.0 Client Secret | Yes |
 | `JWT_SECRET` | Backend | Secret string for signing session JWT tokens | Yes |
 | `VITE_API_URL` | Frontend | Full URL of Go backend API | Yes (Prod) |
-| `ALLOWED_ORIGINS` | Backend | CORS allowed origin origins list (comma-separated) | Yes (Prod) |
+| `ALLOWED_ORIGINS` | Backend | CORS allowed origins list (comma-separated) | Yes (Prod) |
 
 ---
 
@@ -266,9 +267,3 @@ Distributed under the MIT License. See `LICENSE` for more information.
 ## 🤝 Contributing
 
 Contributions are welcome! Feel free to open an issue or submit a pull request.
-
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request

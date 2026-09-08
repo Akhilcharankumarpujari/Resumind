@@ -11,6 +11,7 @@
 /backend/.env
 
 # Backend built binaries & uploads
+*.exe
 /backend/server
 /backend/resumind-server.exe
 /backend/uploads/
