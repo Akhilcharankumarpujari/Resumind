@@ -14,7 +14,6 @@ import (
 
 var DB *gorm.DB
 
-// User is the authenticated user account model.
 type User struct {
 	ID        uint      `gorm:"primaryKey;autoIncrement" json:"id"`
 	GoogleID  string    `gorm:"type:varchar(255);uniqueIndex;not null" json:"google_id"`
@@ -25,7 +24,6 @@ type User struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// Resume is a stored resume analysis record model.
 type Resume struct {
 	ID          string    `gorm:"primaryKey;type:varchar(36)" json:"id"`
 	UserID      uint      `gorm:"not null;index" json:"user_id"`
@@ -40,7 +38,6 @@ type Resume struct {
 	Feedback *Feedback `gorm:"-" json:"feedback,omitempty"`
 }
 
-// Feedback is the AI-generated resume analysis result structure.
 type Feedback struct {
 	OverallScore int          `json:"overallScore"`
 	ATS          SectionScore `json:"ATS"`
@@ -50,20 +47,17 @@ type Feedback struct {
 	Skills       SectionScore `json:"skills"`
 }
 
-// SectionScore holds a category score and actionable tips.
 type SectionScore struct {
 	Score int   `json:"score"`
 	Tips  []Tip `json:"tips"`
 }
 
-// Tip is a single improvement suggestion.
 type Tip struct {
 	Type        string `json:"type"`
 	Tip         string `json:"tip"`
 	Explanation string `json:"explanation,omitempty"`
 }
 
-// AfterFind deserialises FeedbackRaw into Feedback after a GORM query.
 func (r *Resume) AfterFind(tx *gorm.DB) error {
 	if r.FeedbackRaw != "" {
 		var f Feedback
@@ -74,62 +68,48 @@ func (r *Resume) AfterFind(tx *gorm.DB) error {
 	return nil
 }
 
-// InitDB connects to PostgreSQL using the DATABASE_URL environment variable and runs GORM AutoMigrate.
+// InitDB connects to PostgreSQL using DATABASE_URL and auto-migrates the schema.
 //
-// Expected DSN formats:
-//
-//	Render / Cloud PostgreSQL (SSL enabled):
-//	  postgres://user:password@host:5432/dbname?sslmode=require
-//
-//	Local Development / Docker PostgreSQL (SSL disabled):
-//	  postgres://postgres:password@127.0.0.1:5432/resumind?sslmode=disable
+// Local:      DATABASE_URL=postgres://postgres:password@127.0.0.1:5432/resumind?sslmode=disable
+// Production: DATABASE_URL=postgres://user:password@host:5432/dbname?sslmode=require
 func InitDB() {
-	rawDSN := os.Getenv("DATABASE_URL")
-	if rawDSN == "" {
-		rawDSN = os.Getenv("POSTGRES_DSN")
-	}
-	if rawDSN == "" {
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
 		log.Fatal(
 			"DATABASE_URL environment variable is not set.\n" +
-				"Production format: postgres://user:password@host:5432/dbname?sslmode=require\n" +
-				"Local format:      postgres://postgres:password@127.0.0.1:5432/resumind?sslmode=disable",
+				"Local format:      postgres://postgres:password@127.0.0.1:5432/resumind?sslmode=disable\n" +
+				"Production format: postgres://user:password@host:5432/dbname?sslmode=require",
 		)
 	}
 
-	dsn := rawDSN
+	log.Printf("Connecting to PostgreSQL at %s", safeRedactPostgresDSN(dsn))
 
-	targetLog := safeRedactPostgresDSN(dsn)
-	log.Printf("Connecting to PostgreSQL at %s", targetLog)
-
-	var dbErr error
-	for attempt := 1; attempt <= 10; attempt++ {
-		DB, dbErr = gorm.Open(postgres.Open(dsn), &gorm.Config{})
-		if dbErr == nil {
+	var err error
+	for i := 1; i <= 10; i++ {
+		DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
+		if err == nil {
 			break
 		}
-		log.Printf("PostgreSQL connect attempt %d/10 failed: %v — retrying in 3 s...", attempt, dbErr)
+		log.Printf("Failed to connect to PostgreSQL database (attempt %d/10): %v. Retrying in 3 seconds...", i, err)
 		time.Sleep(3 * time.Second)
 	}
-	if dbErr != nil {
-		log.Fatalf("Failed to connect to PostgreSQL after 10 attempts: %v", dbErr)
+	if err != nil {
+		log.Fatalf("Failed to connect to PostgreSQL database after 10 attempts: %v", err)
 	}
 
-	// Auto-migrate database tables
-	if migrateErr := DB.AutoMigrate(&User{}, &Resume{}); migrateErr != nil {
-		log.Fatalf("AutoMigrate failed: %v", migrateErr)
+	err = DB.AutoMigrate(&User{}, &Resume{})
+	if err != nil {
+		log.Fatalf("Failed to auto-migrate database: %v", err)
 	}
 
-	log.Printf("✅ Connected to PostgreSQL (%s) — schema migrated successfully", targetLog)
+	log.Println("✅ Connected to PostgreSQL and migrated schema successfully")
 }
 
-// safeRedactPostgresDSN returns host:port/dbname with credentials masked for safe logging.
+// safeRedactPostgresDSN masks credentials in a postgres:// URL for safe log output.
 func safeRedactPostgresDSN(raw string) string {
 	u, err := url.Parse(raw)
 	if err != nil || u.Scheme == "" || u.Host == "" {
 		return "invalid-dsn"
 	}
-	host := u.Host
-	path := strings.TrimPrefix(u.Path, "/")
-	scheme := u.Scheme
-	return scheme + "://***@" + host + "/" + path
+	return u.Scheme + "://***@" + u.Host + "/" + strings.TrimPrefix(u.Path, "/")
 }
