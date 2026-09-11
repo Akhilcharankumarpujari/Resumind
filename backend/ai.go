@@ -80,7 +80,7 @@ func AnalyzeResume(resumeText, jobTitle, jobDesc string) (*Feedback, error) {
 	resp, err := client.CreateChatCompletion(
 		context.Background(),
 		openai.ChatCompletionRequest{
-			Model: "llama-3.3-70b-versatile",
+			Model: "openai/gpt-oss-120b",
 			Messages: []openai.ChatCompletionMessage{
 				{
 					Role:    openai.ChatMessageRoleSystem,
