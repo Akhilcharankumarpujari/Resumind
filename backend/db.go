@@ -89,9 +89,6 @@ func InitDB() {
 		rawDSN = os.Getenv("POSTGRES_DSN")
 	}
 	if rawDSN == "" {
-		rawDSN = os.Getenv("MYSQL_DSN")
-	}
-	if rawDSN == "" {
 		log.Fatal(
 			"DATABASE_URL environment variable is not set.\n" +
 				"Production format: postgres://user:password@host:5432/dbname?sslmode=require\n" +
@@ -99,11 +96,7 @@ func InitDB() {
 		)
 	}
 
-	// Sanitize / ensure valid scheme for GORM PostgreSQL driver
 	dsn := rawDSN
-	if strings.HasPrefix(dsn, "mysql://") {
-		log.Fatal("MYSQL_DSN is obsolete. Please update environment variable to DATABASE_URL with postgres:// scheme.")
-	}
 
 	targetLog := safeRedactPostgresDSN(dsn)
 	log.Printf("Connecting to PostgreSQL at %s", targetLog)
