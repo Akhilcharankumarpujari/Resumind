@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// TestPostgresDSNParsing tests various PostgreSQL connection URL formats (Render, local, SSL modes).
+// TestPostgresDSNParsing tests various PostgreSQL connection URL formats (cloud, local, SSL modes).
 func TestPostgresDSNParsing(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -17,10 +17,10 @@ func TestPostgresDSNParsing(t *testing.T) {
 		wantSSLMode string
 	}{
 		{
-			name:        "Render / Cloud Production PostgreSQL (SSL required)",
-			dsn:         "postgres://resumind_user:SecretPass123@dpg-c123456789-a.render.com:5432/resumind_db?sslmode=require",
+			name:        "Cloud Production PostgreSQL (SSL required)",
+			dsn:         "postgres://resumind_user:SecretPass123@postgres.production.aws.internal:5432/resumind_db?sslmode=require",
 			wantScheme:  "postgres",
-			wantHost:    "dpg-c123456789-a.render.com:5432",
+			wantHost:    "postgres.production.aws.internal:5432",
 			wantPath:    "/resumind_db",
 			wantSSLMode: "require",
 		},

@@ -40,14 +40,11 @@ resumind/
 │   └── nginx.conf                # Unified routing for SPA and /api/
 ├── .github/                      # CI/CD Workflows
 │   └── workflows/
-│       ├── ci.yml                # Monorepo automated test & build check
-│       └── keep-alive.yml        # Health ping scheduled workflow
+│       └── ci.yml                # Monorepo automated test & build check
 ├── docker-compose.yml            # Multi-container orchestration (DB, Backend, Frontend, Proxy)
 ├── .dockerignore                 # Docker build exclusion rules
 ├── .gitignore                    # Monorepo Git ignore rules
 ├── .env.example                  # Root environment template for Docker Compose
-├── render.yaml                   # Optional Render deployment descriptor
-├── vercel.json                   # Optional Vercel deployment descriptor
 └── README.md                     # Documentation
 ```
 
