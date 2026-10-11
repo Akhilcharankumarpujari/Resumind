@@ -1,0 +1,13 @@
+{
+  "outputDirectory": "build/client",
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "https://resumind-8ezm.onrender.com/api/$1"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

@@ -7,9 +7,49 @@
 [![GORM](https://img.shields.io/badge/GORM-v1.31-008080?logo=go&logoColor=white)](https://gorm.io/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
+[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://docker.com/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-**Resumind** is a full-stack, AI-powered resume analysis and applicant tracking system (ATS) optimization platform. Upload any resume PDF alongside a job description to receive instant, actionable feedback across ATS compatibility, content strength, tone, structure, and skill alignment—driven by ultra-fast LLM inference via Groq AI.
+**Resumind** is a full-stack, AI-powered resume analysis and applicant tracking system (ATS) optimization platform structured as a clean production monorepo. Upload any resume PDF alongside a target job description to receive instant, actionable feedback across ATS compatibility, content strength, tone, structure, and skill alignment—powered by ultra-fast LLM inference via Groq AI.
+
+---
+
+## 📁 Repository Structure
+
+```
+resumind/
+├── frontend/                     # React 19 + React Router v7 SPA
+│   ├── app/                      # Application routes, components, and state
+│   ├── constants/                # UI constants and styling presets
+│   ├── public/                   # Static assets, icons, and branding
+│   ├── types/                    # TypeScript interfaces and type declarations
+│   ├── package.json              # Frontend dependencies and scripts
+│   ├── package-lock.json         # Lockfile
+│   ├── vite.config.ts            # Vite 6 config with /api proxy
+│   ├── react-router.config.ts    # React Router SPA configuration
+│   ├── tsconfig.json             # TypeScript configuration
+│   ├── Dockerfile                # Frontend multi-stage container build
+│   └── .env.example              # Frontend environment template
+├── backend/                      # High-performance Go (Fiber v2) REST API
+│   ├── *.go                      # API handlers, models, AI, DB, and auth logic
+│   ├── go.mod                    # Go module definition
+│   ├── go.sum                    # Go module checksums
+│   ├── Dockerfile                # Backend multi-stage container build
+│   └── .env.example              # Backend environment template
+├── nginx/                        # Reverse proxy configuration
+│   └── nginx.conf                # Unified routing for SPA and /api/
+├── .github/                      # CI/CD Workflows
+│   └── workflows/
+│       ├── ci.yml                # Monorepo automated test & build check
+│       └── keep-alive.yml        # Health ping scheduled workflow
+├── docker-compose.yml            # Multi-container orchestration (DB, Backend, Frontend, Proxy)
+├── .dockerignore                 # Docker build exclusion rules
+├── .gitignore                    # Monorepo Git ignore rules
+├── .env.example                  # Root environment template for Docker Compose
+├── render.yaml                   # Optional Render deployment descriptor
+├── vercel.json                   # Optional Vercel deployment descriptor
+└── README.md                     # Documentation
+```
 
 ---
 
@@ -26,187 +66,144 @@
 - 💡 **Actionable Improvement Tips**: Specific suggestions categorized by priority (`critical`, `warning`, `suggestion`).
 - 🔐 **Google OAuth 2.0 & Session Security**: Secure single-sign-on (SSO) with JWT authentication supported by both HTTP-Only cookies and Bearer tokens.
 - 📁 **Resume History & Management**: View past resume scores, inspect detailed feedback reports, download uploaded PDFs, or delete records.
-- ⚡ **Production-Grade Architecture**: Designed for modern decoupled deployments (Vercel Frontend + Render Backend + Render PostgreSQL).
-- 🧩 **PostgreSQL & Vector Extension Ready**: Structured database schema natively compatible with `pgvector` for future semantic resume search and embedding matching.
-
----
-
-## 🏗️ Architecture Overview
-
-```
-                      ┌───────────────────────────────┐
-                      │    Client / Web Browser       │
-                      └──────────────┬────────────────┘
-                                     │
-                 ┌───────────────────┴───────────────────┐
-                 │                                       │
-                 ▼                                       ▼
-     ┌──────────────────────┐                ┌──────────────────────┐
-     │  Vercel Frontend     │                │   Render Backend     │
-     │  (React Router v7)   │─── API Calls ──►   (Go / Fiber v2)    │
-     └──────────────────────┘                └──────────┬───────────┘
-                                                        │
-                         ┌──────────────────────────────┼──────────────────────────────┐
-                         ▼                              ▼                              ▼
-              ┌─────────────────────┐        ┌─────────────────────┐        ┌─────────────────────┐
-              │     Groq AI API     │        │ Render PostgreSQL DB│        │ Local Uploads Dir   │
-              │  (Llama-3 / GPT)    │        │  (GORM / PG Driver) │        │   (PDF Storage)     │
-              └─────────────────────┘        └─────────────────────┘        └─────────────────────┘
-```
+- 🐳 **Production-Ready Docker Orchestration**: Complete local and cloud deployment setup with Postgres, Go Backend, React SPA, and Nginx reverse proxy.
 
 ---
 
 ## 🛠️ Tech Stack
 
-### Frontend
-- **Framework**: React 19 + React Router v7 (SPA / Server-capable)
+### Frontend (`frontend/`)
+- **Framework**: React 19 + React Router v7 (SPA mode)
 - **Build Tool**: Vite 6
 - **Styling**: Tailwind CSS v4 + `tw-animate-css`
 - **State Management**: Zustand
 - **File Upload**: `react-dropzone`
-- **Icons**: Lucide React
 
-### Backend
-- **Language**: Go (Golang)
+### Backend (`backend/`)
+- **Language**: Go (Golang 1.22+)
 - **Web Framework**: Fiber v2 (FastHTTP engine)
-- **ORM & Database**: GORM + `gorm.io/driver/postgres` (PostgreSQL 16)
-- **Authentication**: JWT (`golang-jwt/jwt/v5`) + Google Identity API (`google.golang.org/api/idtoken`)
+- **ORM & Database**: GORM + `gorm.io/driver/postgres` (PostgreSQL 16+)
+- **Authentication**: JWT (`golang-jwt/jwt/v5`) + Google Identity API
 - **PDF Extraction**: `github.com/ledongthuc/pdf`
-- **AI Engine**: Groq Client (`github.com/sashabaranov/go-openai`)
+- **AI Inference**: Groq Cloud API (`openai/gpt-oss-120b` or Llama 3)
 
 ---
 
-## 🚀 Getting Started Locally
+## 🚀 Local Development
 
-### Prerequisites
+### 1. Prerequisites
 - **Node.js**: v20 or higher
-- **Go**: 1.22 or higher
-- **PostgreSQL**: Local PostgreSQL server (port 5432) or Docker
-- **Groq API Key**: Get a free key at [console.groq.com](https://console.groq.com/keys)
-- **Google OAuth Client ID**: Get one at [console.cloud.google.com](https://console.cloud.google.com/apis/credentials)
+- **Go**: v1.22 or higher
+- **Docker & Docker Compose**: Optional, for containerized run
+- **Groq API Key**: [console.groq.com/keys](https://console.groq.com/keys)
+- **Google OAuth Client ID**: [console.cloud.google.com/apis/credentials](https://console.cloud.google.com/apis/credentials)
 
 ---
 
-### 1. Clone the Repository
+### 2. Running Locally (Separated Services)
 
+#### Step A: Start Database & Backend
 ```bash
-git clone https://github.com/Akhilcharankumarpujari/Resumind.git
-cd Resumind
-```
+# 1. Start a local PostgreSQL instance (or use Docker):
+docker run --name resumind-db -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=resumind -p 5432:5432 -d postgres:16
 
----
-
-### 2. Configure Environment Variables
-
-#### Backend (`backend/.env`)
-Create a `.env` file in the `backend/` directory:
-
-```ini
-# PostgreSQL Connection (Local Docker or Local PostgreSQL)
-DATABASE_URL=postgres://postgres:rootpassword@127.0.0.1:5432/resumind?sslmode=disable
-
-# Google OAuth 2.0 Credentials
-GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=your-google-client-secret
-
-# Groq AI API Key
-GROQ_API_KEY=gsk_your_groq_api_key_here
-GROQ_MODEL=openai/gpt-oss-120b
-
-# JWT Authentication Secret (Minimum 32 characters)
-JWT_SECRET=your-32-character-secret-key-goes-here
-
-# Server Settings
-PORT=8081
-UPLOADS_DIR=./uploads
-ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000
-```
-
-#### Frontend (`.env`)
-Create a `.env` file in the project root:
-
-```ini
-VITE_GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
-VITE_API_URL=http://localhost:8081
-```
-
----
-
-### 3. Run Database & Backend
-
-#### Option A: Using Local Docker Compose (Recommended)
-```bash
-docker-compose up -d db
+# 2. Configure backend environment:
 cd backend
+cp .env.example .env
+# Edit .env with your GROQ_API_KEY and GOOGLE credentials
+
+# 3. Start the Go backend:
 go run .
+# Backend starts listening on http://localhost:8082
 ```
 
-#### Option B: Manual PostgreSQL Setup
-Make sure your local PostgreSQL service is running and create the `resumind` database:
-```sql
-CREATE DATABASE resumind;
-```
-Then run the Go backend:
+#### Step B: Start Frontend
 ```bash
-cd backend
-go run .
-```
-The backend will run on `http://localhost:8081` and automatically migrate database schemas.
+# 1. In a separate terminal:
+cd frontend
+cp .env.example .env
 
----
-
-### 4. Run Frontend
-
-In a new terminal window at the project root:
-
-```bash
-npm install
+# 2. Install dependencies & run development server:
+npm ci
 npm run dev
+# Frontend starts on http://localhost:5173 with Vite proxying /api to http://localhost:8082
 ```
-
-Open `http://localhost:5173` in your browser.
 
 ---
 
 ## 🐳 Running Full Stack with Docker Compose
 
-To start PostgreSQL, Backend, Frontend, and Nginx proxy together:
+To start PostgreSQL, Backend, Frontend, and Nginx proxy with a single command:
 
 ```bash
-docker-compose up --build
+# 1. Create root .env file from template:
+cp .env.example .env
+# Fill in POSTGRES_PASSWORD, GROQ_API_KEY, and Google OAuth credentials
+
+# 2. Build and launch all services:
+docker compose up --build -d
+
+# 3. View running containers:
+docker compose ps
 ```
 
-Access the application at `http://localhost`.
+The stack will be available at:
+- **Application (Proxy)**: `http://localhost`
+- **API Health Check**: `http://localhost/health`
+- **PostgreSQL**: `127.0.0.1:5432`
+
+To stop the containers:
+```bash
+docker compose down
+```
 
 ---
 
-## 🌐 Production Deployment Guide
+## 🌐 AWS EC2 Production Deployment
 
-Resumind is configured for a multi-cloud production architecture:
+Resumind runs in production on AWS EC2 (`resumind-server`) at **`http://52.23.111.29.nip.io/`**.
 
-### 1. Backend → [Render](https://render.com)
-- **Environment**: Go runtime
-- **Root Directory**: `backend`
-- **Build Command**: `go build -o server .`
-- **Start Command**: `./server`
-- **Environment Variables**:
-  - `DATABASE_URL`: `postgres://user:password@host:5432/dbname?sslmode=require`
-  - `GROQ_API_KEY`: `gsk_...`
-  - `GOOGLE_CLIENT_ID`: `...apps.googleusercontent.com`
-  - `JWT_SECRET`: Generate a secure 32+ character random string
-  - `ALLOWED_ORIGINS`: `https://your-app.vercel.app`
+> **Note**: A separate project (ReachInbox) runs on EC2 instance `3.89.202.15` under security group `reachinbox-sg`. Do not modify or restart that instance.
 
-### 2. Database → [Render PostgreSQL](https://render.com/docs/databases) or Managed PostgreSQL
-- Create a PostgreSQL database on Render or any managed provider.
-- Set `DATABASE_URL` in the Render backend web service environment variables using the provided connection string (`sslmode=require`).
+### Safe Deployment Procedure to `resumind-server`
 
-### 3. Frontend → [Vercel](https://vercel.com)
-- **Framework Preset**: Vite / React Router
-- **Build Command**: `npm run build`
-- **Output Directory**: `build/client`
-- **Environment Variables**:
-  - `VITE_API_URL`: `https://resumind-backend.onrender.com`
-  - `VITE_GOOGLE_CLIENT_ID`: `...apps.googleusercontent.com`
+#### 1. Build the Production Frontend
+On your local machine or CI:
+```bash
+cd frontend
+npm ci
+npm run build
+# Generates static assets in frontend/build/client/
+```
+
+#### 2. Deploy Frontend Assets to EC2
+```bash
+# Backup existing web directory on EC2:
+ssh -i resumind-key.pem ec2-user@52.23.111.29 "sudo cp -r /var/www/resumind/dist /var/www/resumind/dist.bak"
+
+# Upload new build:
+scp -i resumind-key.pem -r frontend/build/client ec2-user@52.23.111.29:/tmp/dist
+
+# Replace and set correct permissions:
+ssh -i resumind-key.pem ec2-user@52.23.111.29 "sudo rm -rf /var/www/resumind/dist && \
+  sudo cp -r /tmp/dist /var/www/resumind/dist && \
+  sudo chown -R nginx:nginx /var/www/resumind/dist && \
+  sudo find /var/www/resumind/dist -type d -exec chmod 755 {} + && \
+  sudo find /var/www/resumind/dist -type f -exec chmod 644 {} + && \
+  sudo systemctl reload nginx"
+```
+
+#### 3. Update & Restart Backend (if Go source changed)
+```bash
+# Upload backend updates and restart systemd service:
+ssh -i resumind-key.pem ec2-user@52.23.111.29 "sudo systemctl restart resumind && sudo systemctl status resumind"
+```
+
+#### 4. Verify Live Production
+```bash
+curl -i http://52.23.111.29.nip.io/health
+curl -i http://52.23.111.29.nip.io/
+```
 
 ---
 
@@ -228,42 +225,21 @@ Resumind is configured for a multi-cloud production architecture:
 
 ## 🧪 Testing
 
-Run backend unit and integration tests (PostgreSQL DSN parsing, URL validation, safe redaction):
-
+### Backend Unit & Integration Tests
 ```bash
 cd backend
 go test -v ./...
 ```
 
-Run TypeScript typechecks on the frontend:
-
+### Frontend Typechecking & Verification
 ```bash
+cd frontend
 npm run typecheck
+npm run build
 ```
-
----
-
-## 📋 Environment Variables Summary
-
-| Variable | Scope | Description | Required |
-| :--- | :--- | :--- | :---: |
-| `DATABASE_URL` | Backend | PostgreSQL connection string (`postgres://user:pass@host:5432/dbname?sslmode=disable`) | Yes |
-| `GROQ_API_KEY` | Backend | Groq Cloud AI API key | Yes |
-| `GROQ_MODEL` | Backend | AI Model (default: `openai/gpt-oss-120b`) | No |
-| `GOOGLE_CLIENT_ID` | Backend/Frontend | Google OAuth 2.0 Client ID | Yes |
-| `GOOGLE_CLIENT_SECRET` | Backend | Google OAuth 2.0 Client Secret | Yes |
-| `JWT_SECRET` | Backend | Secret string for signing session JWT tokens | Yes |
-| `VITE_API_URL` | Frontend | Full URL of Go backend API | Yes (Prod) |
-| `ALLOWED_ORIGINS` | Backend | CORS allowed origins list (comma-separated) | Yes (Prod) |
 
 ---
 
 ## 📄 License
 
 Distributed under the MIT License. See `LICENSE` for more information.
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Feel free to open an issue or submit a pull request.

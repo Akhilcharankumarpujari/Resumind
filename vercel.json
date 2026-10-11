@@ -1,5 +1,5 @@
 {
-  "outputDirectory": "build/client",
+  "outputDirectory": "frontend/build/client",
   "rewrites": [
     {
       "source": "/api/(.*)",

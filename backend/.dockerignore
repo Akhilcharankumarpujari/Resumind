@@ -1,0 +1,7 @@
+server*
+*.exe
+uploads/
+.env
+.env.*
+!*.example
+.git

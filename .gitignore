@@ -1,25 +1,41 @@
 .DS_Store
-/node_modules/
-/.react-router/
-/build/
 
-# Environment variables (credentials)
+# Dependencies & Package Managers
+node_modules/
+*/node_modules/
+package-lock.json.bak
+
+# Frontend Build Outputs & Framework Caches
+build/
+*/build/
+.react-router/
+*/.react-router/
+.vite/
+*/.vite/
+
+# Environment Variables & Secrets
 .env
-.env.local
-.env.production
-.env.development
-/backend/.env
+.env.*
+!.env.example
+*/.env
+*/.env.*
+!*/.env.example
 
-# Backend built binaries & uploads
+# Backend Built Binaries & Dynamic Assets
 *.exe
-/backend/server*
-/backend/resumind-*
+server
+server-linux
+backend/server*
+backend/resumind-*
 /backend/uploads/
+uploads/
 
-# Private key files
+# Private Keys & Certificates
 *.pem
+*.key
+*.crt
 resumind-key.pem
 
-# Local utility scripts with database passwords
+# Local Utilities & Temporary Scripts
 view_users.py
-
+*.log

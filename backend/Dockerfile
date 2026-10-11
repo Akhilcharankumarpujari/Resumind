@@ -17,6 +17,6 @@ RUN apk --no-cache add ca-certificates
 COPY --from=builder /app/server .
 COPY --from=builder /app/.env.example .env
 
-EXPOSE 8080
+EXPOSE 8082
 
 CMD ["./server"]
