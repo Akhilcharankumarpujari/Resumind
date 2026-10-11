@@ -12,8 +12,8 @@
 
 # Backend built binaries & uploads
 *.exe
-/backend/server
-/backend/resumind-server.exe
+/backend/server*
+/backend/resumind-*
 /backend/uploads/
 
 # Private key files

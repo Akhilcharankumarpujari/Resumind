@@ -14,7 +14,6 @@ import (
 	"gorm.io/gorm"
 )
 
-
 type JWTClaims struct {
 	UserID   uint   `json:"user_id"`
 	Email    string `json:"email"`
@@ -24,11 +23,9 @@ type JWTClaims struct {
 	jwt.RegisteredClaims
 }
 
-
 type GoogleLoginRequest struct {
 	IDToken string `json:"idToken"`
 }
-
 
 func HandleGoogleAuth(c *fiber.Ctx) error {
 	var body GoogleLoginRequest
@@ -41,18 +38,15 @@ func HandleGoogleAuth(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": "Google Client ID not configured on server"})
 	}
 
-
 	payload, err := idtoken.Validate(context.Background(), body.IDToken, clientID)
 	if err != nil {
 		return c.Status(401).JSON(fiber.Map{"error": "Invalid Google token"})
 	}
 
-
 	googleID := payload.Subject
 	email := fmt.Sprintf("%v", payload.Claims["email"])
 	name := fmt.Sprintf("%v", payload.Claims["name"])
 	picture := fmt.Sprintf("%v", payload.Claims["picture"])
-
 
 	var user User
 	result := DB.Where("google_id = ?", googleID).First(&user)
@@ -77,19 +71,22 @@ func HandleGoogleAuth(c *fiber.Ctx) error {
 		})
 	}
 
-
 	jwtToken, err := generateJWT(user)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed to generate session token"})
 	}
 
+	secureCookie := false
+	if os.Getenv("COOKIE_SECURE") == "true" || c.Protocol() == "https" || c.Get("X-Forwarded-Proto") == "https" {
+		secureCookie = true
+	}
 
 	c.Cookie(&fiber.Cookie{
 		Name:     "auth_token",
 		Value:    jwtToken,
 		HTTPOnly: true,
-		Secure:   true,
-		SameSite: "Strict",
+		Secure:   secureCookie,
+		SameSite: "Lax",
 		Expires:  time.Now().Add(7 * 24 * time.Hour),
 		Path:     "/",
 	})
@@ -104,7 +101,6 @@ func HandleGoogleAuth(c *fiber.Ctx) error {
 	})
 }
 
-
 func HandleGetMe(c *fiber.Ctx) error {
 	user := c.Locals("user").(*JWTClaims)
 	return c.JSON(fiber.Map{
@@ -115,20 +111,23 @@ func HandleGetMe(c *fiber.Ctx) error {
 	})
 }
 
-
 func HandleLogout(c *fiber.Ctx) error {
+	secureCookie := false
+	if os.Getenv("COOKIE_SECURE") == "true" || c.Protocol() == "https" || c.Get("X-Forwarded-Proto") == "https" {
+		secureCookie = true
+	}
+
 	c.Cookie(&fiber.Cookie{
 		Name:     "auth_token",
 		Value:    "",
 		HTTPOnly: true,
-		Secure:   true,
-		SameSite: "Strict",
+		Secure:   secureCookie,
+		SameSite: "Lax",
 		Expires:  time.Now().Add(-1 * time.Hour),
 		Path:     "/",
 	})
 	return c.JSON(fiber.Map{"message": "Logged out successfully"})
 }
-
 
 func AuthMiddleware(c *fiber.Ctx) error {
 	tokenStr := c.Cookies("auth_token")
@@ -153,7 +152,6 @@ func AuthMiddleware(c *fiber.Ctx) error {
 	return c.Next()
 }
 
-
 func generateJWT(user User) (string, error) {
 	secret := os.Getenv("JWT_SECRET")
 	if secret == "" {
@@ -175,7 +173,6 @@ func generateJWT(user User) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(secret))
 }
-
 
 func validateJWT(tokenStr string) (*JWTClaims, error) {
 	secret := os.Getenv("JWT_SECRET")

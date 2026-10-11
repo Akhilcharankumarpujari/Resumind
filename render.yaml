@@ -5,6 +5,7 @@ services:
     rootDir: backend
     buildCommand: go build -o server .
     startCommand: ./server
+    healthCheckPath: /health
     envVars:
       - key: PORT
         value: 8080
